@@ -1,8 +1,7 @@
 from argparse import ArgumentParser as AP
 from pathlib import Path
+import fnmatch
 import tensorflow as tf
-#import numpy as np
-#import abies_model as am
 import image_loader as il
 import yaml_loader as yl
 
@@ -116,7 +115,6 @@ def do_dump_network(namespace):
     # build
     reader = tf.WholeFileReader()
     with tf.variable_scope('image_loader'), tf.device('/cpu:0'):
-        print('read samples directory')
         samples = ['dummy']
 
         batch_images = il.build_full_network(
@@ -125,17 +123,18 @@ def do_dump_network(namespace):
         image_summary = tf.image_summary('input_image', batch_images)
 
     with tf.variable_scope(ROOT_VARIABLE_SCOPE):
-        print('build network')
         graph_root = yl.load(MODEL_YAML_PATH)
         tags = graph_root.build(feed_dict={'root': batch_images})
 
     print('-- variables')
     for variable in tf.all_variables():
-        print(variable.name)
+        if fnmatch.fnmatch(variable.name, namespace.pattern):
+            print(variable.name)
 
     print('-- operations')
     for operation in tf.get_default_graph().get_operations():
-        print(operation.name)
+        if fnmatch.fnmatch(operation.name, namespace.pattern):
+            print(operation.name)
 
 # --------------------------------------------------------------------------------
 # command line option parser
@@ -159,6 +158,7 @@ def create_parser():
     sub_parser.set_defaults(func=do_eval)
     sub_parser = sub_parsers.add_parser('dump-network')
     sub_parser.set_defaults(func=do_dump_network)
+    sub_parser.add_argument('--pattern', type=str, default='*')
 
     return parser
 
