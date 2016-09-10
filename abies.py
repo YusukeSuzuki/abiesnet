@@ -57,11 +57,18 @@ def do_train(namespace):
         print('build network')
         graph_root = yl.load(MODEL_YAML_PATH)
         tags = graph_root.build(feed_dict={'root': batch_images})
-        #out, train1 = am.build_full_network(batch_images,
-        #    with_conv1_pre_train=True)
 
     # get optimizer for train
     train = tf.get_default_graph().get_operation_by_name(namespace.optimizer)
+
+    # limit trainable variables
+    trainable_variables = tf.get_default_graph().get_collection_ref(tf.GraphKeys.TRAINABLE_VARIABLES)
+
+    for tv in trainable_variables:
+        if tv.name.startswith(namespace.trainable_scope):
+            print(tv.name)
+        else:
+            trainable_variables.remove(tv)
 
     # create saver and logger
     saver = tf.train.Saver()
@@ -152,6 +159,7 @@ def create_parser():
     sub_parser.set_defaults(func=do_train)
     sub_parser.add_argument('--optimizer', type=str, required=True)
     sub_parser.add_argument('--samples', type=str, default='./samples')
+    sub_parser.add_argument('--trainable-scope', type=str, default='')
     sub_parser = sub_parsers.add_parser('test')
     sub_parser.set_defaults(func=do_test)
     sub_parser = sub_parsers.add_parser('eval')
