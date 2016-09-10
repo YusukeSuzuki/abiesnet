@@ -1,0 +1,102 @@
+---
+user_variables:
+  - op_device: &op_device '/cpu:0'
+root: !root
+  nodes_required: ['root']
+  nodes:
+    - !with
+      variable: conv1
+      nodes:
+      - !conv2d
+        { tag: c1, name: out, source: root, width: 5, height: 5, kernels_num: 64 }
+      - !with
+        variable: train
+        nodes:
+        - !conv2d_transpose
+          {tag: c1_tr, name: conv1tr, source: c1, shape_as: root, width: 5, height: 5}
+        - !conv2d_ae_loss
+          {tag: c1_ae_loss, source1: root, source2: c1_tr}
+        - !adam_optimizer {tag: c1_opt, name: optimizer, source: c1_ae_loss, val: 1e-4}
+      - !with
+        device: '/cpu:0'
+        nodes:
+        - !reduce_mean
+          {tag: c1_ae_loss_mean, source: c1_ae_loss, dims: [1]}
+        - !scalar_summary
+          {tag: c1_ae_loss_mean_sc, summary_tag: 'conv1/loss', source: c1_ae_loss_mean}
+        - !image_summary
+          {tag: c1_tr_img, summary_tag: 'conv1tr/image', source: c1_tr}
+    - !with
+      variable: conv2
+      nodes:
+      - !conv2d
+        { tag: c2, name: out, source: c1, width: 5, height: 5, kernels_num: 64 }
+      - !with
+        variable: train
+        nodes:
+        - !conv2d_transpose
+          {tag: c2_tr, name: conv2tr, source: c2, shape_as: c1, width: 5, height: 5}
+        - !conv2d_ae_loss
+          {tag: c2_ae_loss, source1: c1, source2: c2_tr}
+        - !adam_optimizer {tag: c2_opt, name: optimizer, source: c2_ae_loss, val: 1e-4}
+      - !with
+        device: '/cpu:0'
+        nodes:
+        - !reduce_mean
+          {tag: c2_ae_loss_mean, source: c2_ae_loss, dims: [1]}
+        - !scalar_summary
+          {tag: c2_ae_loss_mean_sc, summary_tag: 'conv2/loss', source: c2_ae_loss_mean}
+    - !with
+      variable: conv3
+      nodes:
+      - !conv2d
+        { tag: c3, name: out, source: c2, width: 5, height: 5, kernels_num: 64 }
+      - !with
+        variable: train
+        nodes:
+        - !conv2d_transpose
+          {tag: c3_tr, name: conv2tr, source: c3, shape_as: c2, width: 5, height: 5}
+        - !conv2d_ae_loss
+          {tag: c3_ae_loss, source1: c2, source2: c3_tr}
+        - !adam_optimizer {tag: c3_opt, name: optimizer, source: c3_ae_loss, val: 1e-4}
+      - !with
+        device: '/cpu:0'
+        nodes:
+        - !reduce_mean
+          {tag: c3_ae_loss_mean, source: c3_ae_loss, dims: [1]}
+        - !scalar_summary
+          {tag: c3_ae_loss_mean_sc, summary_tag: 'conv3/loss', source: c3_ae_loss_mean}
+    - !with
+      variable: maxpool
+      nodes:
+      - !max_pool_2x2
+        {tag: mp1, source: c3}
+#    - !with
+#      variable: train
+#      nodes:
+#      - !with
+#        name: inference
+#        nodes:
+#        - !conv2d_transpose
+#          {tag: conv1_transpose, src: conv1, shape_src: root, w: 5, h: 5}
+#      - !with
+#        name: loss
+#      - !with
+#        name: train
+#        nodes:
+#        - !adam_optimizer {tag: conv1_optimizer, src: conv1_ae_loss, val: 1e-4}
+#  - !with
+#    variable: conv2
+#    nodes:
+#    - !conv2d
+#      {tag: conv2, w: 5, h: 5, ks: 64, src: conv1}
+#  - !with
+#    variable: conv3
+#    nodes:
+#    - !conv2d
+#      {tag: conv3, w: 5, h: 5, ks: 64, src: conv2}
+#  - !with
+#    variable: max_pool1
+#    nodes:
+#    - !max_pool_2x2
+#      {tag: max_pool1, src: conv3}
