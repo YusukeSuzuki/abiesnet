@@ -56,7 +56,7 @@ def do_train(namespace):
     with tf.variable_scope(ROOT_VARIABLE_SCOPE):
         print('build network')
         graph_root = yl.load(MODEL_YAML_PATH)
-        tags = graph_root.build(feed_dict={'root': batch_images})
+        graph_root.build(feed_dict={'root': batch_images})
 
     # get optimizer for train
     train = tf.get_default_graph().get_operation_by_name(namespace.optimizer)
@@ -90,12 +90,14 @@ def do_train(namespace):
         saver.restore(sess, namespace.restore)
 
     print('train')
-    writer.add_graph(tf.get_default_graph())
 
     for i in range(0, 100000):
         print('loop: {}'.format(i))
         summary, res = sess.run( (merged, train), feed_dict={} )
-        writer.add_summary(summary, i)
+
+        if i % 100 == 0:
+          writer.add_summary(summary, i)
+          writer.add_graph(tf.get_default_graph())
 
         if i % 2000 == 1:
             print('save backup to: {}'.format(model_backup_path))
@@ -109,14 +111,10 @@ def do_train(namespace):
     writer.close()
 
 def do_test(namespace):
-    # stub
-    sess = tf.Session()
-    sess.run(tf.initialize_all_variables())
+    print('unavailable now')
 
 def do_eval(namespace):
-    # stub
-    sess = tf.Session()
-    sess.run(tf.initialize_all_variables())
+    print('unavailable now')
 
 def do_dump_network(namespace):
     # build
@@ -143,6 +141,31 @@ def do_dump_network(namespace):
         if fnmatch.fnmatch(operation.name, namespace.pattern):
             print(operation.name)
 
+def do_dump_graph_log(namespace):
+    # build
+    #print('exclude tags: {}'.format(namespace.exclude_tags.split(',')))
+
+    reader = tf.WholeFileReader()
+    with tf.variable_scope('image_loader'), tf.device('/cpu:0'):
+        samples = ['dummy']
+
+        batch_images = il.build_full_network(
+            samples, INPUT_HEIGHT, INPUT_WIDTH, INPUT_CHANNELS, 16, reader,
+            **loader_param)
+        image_summary = tf.image_summary('input_image', batch_images)
+
+    with tf.variable_scope(ROOT_VARIABLE_SCOPE):
+        graph_root = yl.load(MODEL_YAML_PATH)
+        tags = graph_root.build(feed_dict={'root': batch_images},
+            exclude_tags=namespace.exclude_tags.split(','))
+
+    sess = tf.Session()
+    writer = tf.train.SummaryWriter(namespace.logdir, sess.graph)
+    init = tf.initialize_all_variables()
+    sess.run(init)
+    writer.add_graph(tf.get_default_graph())
+    writer.close()
+
 # --------------------------------------------------------------------------------
 # command line option parser
 # --------------------------------------------------------------------------------
@@ -160,13 +183,20 @@ def create_parser():
     sub_parser.add_argument('--optimizer', type=str, required=True)
     sub_parser.add_argument('--samples', type=str, default='./samples')
     sub_parser.add_argument('--trainable-scope', type=str, default='')
+
     sub_parser = sub_parsers.add_parser('test')
     sub_parser.set_defaults(func=do_test)
+
     sub_parser = sub_parsers.add_parser('eval')
     sub_parser.set_defaults(func=do_eval)
+
     sub_parser = sub_parsers.add_parser('dump-network')
     sub_parser.set_defaults(func=do_dump_network)
     sub_parser.add_argument('--pattern', type=str, default='*')
+
+    sub_parser = sub_parsers.add_parser('dump-graph-log')
+    sub_parser.set_defaults(func=do_dump_graph_log)
+    sub_parser.add_argument('--exclude-tags', type=str, default='')
 
     return parser
 
